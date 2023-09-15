@@ -1,0 +1,75 @@
+---
+title: "VideoGameSales"
+output: html_document
+---
+
+*This is a compilation of several R scripts & markdowns used for the 2023 Data Contest. This document was made after the completion of the contest to create one cohesive record of the work produced by Zach Sabey, Andrew Bargeron, Nate Cox, and Ty Hawkes.*
+
+#### Importing Libraries
+```{r, echo = False}
+library(tidyverse)
+```
+
+#### Data Wrangling
+```{r}
+# Wrangling global hardware sales data from VGChartz.com into a CSV
+php_string <- read_file('hw_date.php')
+
+DS <- c('DS', str_extract(php_string, "(?s)name:'DS',(.*)\\},\\]"))
+NS <- c('NS', str_extract(php_string, "(?s)name:'NS',(.*)\\},\\]"))
+PS3 <- c('PS3', str_extract(php_string, "(?s)name:'PS3',(.*)\\},\\]"))
+PS4 <- c('PS4', str_extract(php_string, "(?s)name:'PS4',(.*)\\},\\]"))
+PS5 <- c('PS5', str_extract(php_string, "(?s)name:'PS5',(.*)\\},\\]"))
+PSP <- c('PSP', str_extract(php_string, "(?s)name:'PSP',(.*)\\},\\]"))
+PSV <- c('PSV', str_extract(php_string, "(?s)name:'PSV',(.*)\\},\\]"))
+ThreeDS <- c('ThreeDS', str_extract(php_string, "(?s)name:'3DS',(.*)\\},\\]"))
+Wii <- c('Wii', str_extract(php_string, "(?s)name:'Wii',(.*)\\},\\]"))
+WiiU <- c('WiiU', str_extract(php_string, "(?s)name:'WiiU',(.*)\\},\\]"))
+x360 <- c('x360', str_extract(php_string, "(?s)name:'X360',(.*)\\},\\]"))
+XOne <- c('XOne', str_extract(php_string, "(?s)name:'XOne',(.*)\\},\\]"))
+Xs <- c('Xs', str_extract(php_string, "(?s)name:'XS',(.*)\\},\\]"))
+
+console_string_list <- list(DS, 
+                         NS, 
+                         PS3, 
+                         PS4, 
+                         PS5, 
+                         PSP, 
+                         PSV, 
+                         ThreeDS, 
+                         Wii, 
+                         WiiU, 
+                         x360, 
+                         XOne, 
+                         Xs)
+
+first_table = TRUE
+for (console in console_string_list){
+  x <- str_extract_all(console[2], '(?<=x: )\\d*(?=,)')
+  y <- str_extract_all(console[2], '(?<=y: )\\d*(?=\\n)')
+  df <- tibble(x = as.numeric(unlist(x)), y = as.numeric(unlist(y)))
+  df <- df %>%
+    group_by(x) %>%
+    summarise(y = sum(y))
+  colnames(df) <- c('t', console[1])
+  if (first_table){
+    df_all <- df
+    first_table = FALSE
+  }
+  else{
+    df_all <- df_all %>%
+      full_join(df, by = 't')
+  }
+}
+
+HardwareGlobalWeekly <- df_all %>%
+  mutate(t = as_datetime(t/1000))
+```
+
+#### Exploratory Data Analysis
+```{r}
+
+```
+
+
+
