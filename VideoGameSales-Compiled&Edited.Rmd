@@ -6,69 +6,136 @@ output: html_document
 *This is a compilation of several R scripts & markdowns used for the 2023 Data Contest. This document was made after the completion of the contest to create one cohesive record of the work produced by Zach Sabey, Andrew Bargeron, Nate Cox, and Ty Hawkes.*
 
 #### Importing Libraries
-```{r, echo = False}
+```{r, warning=FALSE,message=FALSE}
 library(tidyverse)
+library(vroom)
 ```
 
 #### Data Wrangling
-```{r}
-# Wrangling global hardware sales data from VGChartz.com into a CSV
-php_string <- read_file('hw_date.php')
-
-DS <- c('DS', str_extract(php_string, "(?s)name:'DS',(.*)\\},\\]"))
-NS <- c('NS', str_extract(php_string, "(?s)name:'NS',(.*)\\},\\]"))
-PS3 <- c('PS3', str_extract(php_string, "(?s)name:'PS3',(.*)\\},\\]"))
-PS4 <- c('PS4', str_extract(php_string, "(?s)name:'PS4',(.*)\\},\\]"))
-PS5 <- c('PS5', str_extract(php_string, "(?s)name:'PS5',(.*)\\},\\]"))
-PSP <- c('PSP', str_extract(php_string, "(?s)name:'PSP',(.*)\\},\\]"))
-PSV <- c('PSV', str_extract(php_string, "(?s)name:'PSV',(.*)\\},\\]"))
-ThreeDS <- c('ThreeDS', str_extract(php_string, "(?s)name:'3DS',(.*)\\},\\]"))
-Wii <- c('Wii', str_extract(php_string, "(?s)name:'Wii',(.*)\\},\\]"))
-WiiU <- c('WiiU', str_extract(php_string, "(?s)name:'WiiU',(.*)\\},\\]"))
-x360 <- c('x360', str_extract(php_string, "(?s)name:'X360',(.*)\\},\\]"))
-XOne <- c('XOne', str_extract(php_string, "(?s)name:'XOne',(.*)\\},\\]"))
-Xs <- c('Xs', str_extract(php_string, "(?s)name:'XS',(.*)\\},\\]"))
-
-console_string_list <- list(DS, 
-                         NS, 
-                         PS3, 
-                         PS4, 
-                         PS5, 
-                         PSP, 
-                         PSV, 
-                         ThreeDS, 
-                         Wii, 
-                         WiiU, 
-                         x360, 
-                         XOne, 
-                         Xs)
-
-first_table = TRUE
-for (console in console_string_list){
-  x <- str_extract_all(console[2], '(?<=x: )\\d*(?=,)')
-  y <- str_extract_all(console[2], '(?<=y: )\\d*(?=\\n)')
-  df <- tibble(x = as.numeric(unlist(x)), y = as.numeric(unlist(y)))
-  df <- df %>%
-    group_by(x) %>%
-    summarise(y = sum(y))
-  colnames(df) <- c('t', console[1])
-  if (first_table){
-    df_all <- df
-    first_table = FALSE
+```{r, warning=FALSE,message=FALSE}
+get_df_from_php <- function(file.php){
+  
+  # Read php to string
+  php_string <- read_file('hw_date.php')
+  
+  # Separate into relavent consoles
+  DS <- c('DS', str_extract(php_string, "(?s)name:'DS',(.*)\\},\\]"))
+  NS <- c('NS', str_extract(php_string, "(?s)name:'NS',(.*)\\},\\]"))
+  PS3 <- c('PS3', str_extract(php_string, "(?s)name:'PS3',(.*)\\},\\]"))
+  PS4 <- c('PS4', str_extract(php_string, "(?s)name:'PS4',(.*)\\},\\]"))
+  PS5 <- c('PS5', str_extract(php_string, "(?s)name:'PS5',(.*)\\},\\]"))
+  PSP <- c('PSP', str_extract(php_string, "(?s)name:'PSP',(.*)\\},\\]"))
+  PSV <- c('PSV', str_extract(php_string, "(?s)name:'PSV',(.*)\\},\\]"))
+  ThreeDS <- c('ThreeDS', str_extract(php_string, "(?s)name:'3DS',(.*)\\},\\]"))
+  Wii <- c('Wii', str_extract(php_string, "(?s)name:'Wii',(.*)\\},\\]"))
+  WiiU <- c('WiiU', str_extract(php_string, "(?s)name:'WiiU',(.*)\\},\\]"))
+  x360 <- c('x360', str_extract(php_string, "(?s)name:'X360',(.*)\\},\\]"))
+  XOne <- c('XOne', str_extract(php_string, "(?s)name:'XOne',(.*)\\},\\]"))
+  Xs <- c('Xs', str_extract(php_string, "(?s)name:'XS',(.*)\\},\\]"))
+  
+  # Add to list
+  console_string_list <- list(DS, 
+                           NS, 
+                           PS3, 
+                           PS4, 
+                           PS5, 
+                           PSP, 
+                           PSV, 
+                           ThreeDS, 
+                           Wii, 
+                           WiiU, 
+                           x360, 
+                           XOne, 
+                           Xs)
+  
+  # Convert to df's and join together
+  first_table = TRUE
+  for (console in console_string_list){
+    x <- str_extract_all(console[2], '(?<=x: )\\d*(?=,)')
+    y <- str_extract_all(console[2], '(?<=y: )\\d*(?=\\n)')
+    df <- tibble(x = as.numeric(unlist(x)), y = as.numeric(unlist(y)))
+    df <- df %>%
+      group_by(x) %>%
+      summarise(y = sum(y))
+    colnames(df) <- c('t', console[1])
+    if (first_table){
+      df_all <- df
+      first_table = FALSE
+    }
+    else{
+      df_all <- df_all %>%
+        full_join(df, by = 't')
+    }
   }
-  else{
-    df_all <- df_all %>%
-      full_join(df, by = 't')
-  }
+  
+  # Convert unix timestamp to datetime
+  df_all <- df_all %>%
+    mutate(t = as_datetime(t/1000))
+  
+  return(df_all)
 }
 
-HardwareGlobalWeekly <- df_all %>%
-  mutate(t = as_datetime(t/1000))
+# Getting hardware sales data
+HardwareGlobalWeekly <- get_df_from_php('hw_date.php') %>%
+  mutate_all(~replace(., is.na(.), 0)) %>%
+  transmute(time = t, 
+            Global_h_sales = DS + NS + PS3 + PS4 + PS5 + PSP + PSV + ThreeDS + Wii + WiiU + x360 + XOne + Xs)
+HardwareUSAWeekly <- get_df_from_php('hw_date_USA.php') %>%
+  mutate_all(~replace(., is.na(.), 0)) %>%
+  transmute(time = t, 
+            USA_h_sales = DS + NS + PS3 + PS4 + PS5 + PSP + PSV + ThreeDS + Wii + WiiU + x360 + XOne + Xs)
+HardwareJapanWeekly <- get_df_from_php('hw_date_Japan.php') %>%
+  mutate_all(~replace(., is.na(.), 0)) %>%
+  transmute(time = t, 
+            Japan_h_sales = DS + NS + PS3 + PS4 + PS5 + PSP + PSV + ThreeDS + Wii + WiiU + x360 + XOne + Xs)
+
+hardware_sales_yearly <- HardwareGlobalWeekly %>%
+  inner_join(HardwareUSAWeekly, by = 'time') %>%
+  inner_join(HardwareJapanWeekly, by = 'time') %>%
+  mutate(Year = year(time)) %>%
+  group_by(Year) %>%
+  summarise(Global_h_sales = sum(Global_h_sales), 
+            USA_h_sales = sum(USA_h_sales), 
+            Japan_h_sales = sum(Japan_h_sales))
+
+
+# Getting software sales data (from kaggle)
+software_sales_yearly <- vroom('vgsales.csv') %>%
+  mutate(Year = as.numeric(Year)) %>%
+  group_by(Year) %>%
+  summarise(Global_s_sales = sum(Global_Sales)*1000000, 
+            USA_s_sales = sum(NA_Sales)*1000000, 
+            Japan_s_sales = sum(JP_Sales)*1000000)
+
+# Getting data for potential economic indicators of video game sales 
+# *These csv's were created using public data from the OECD and World Bank*
+economic_indicators <- vroom('Indicators_edit.csv')
+
+cci <- vroom('CCI.csv') %>%
+  pivot_wider(names_from = LOCATION, values_from = CCI) %>%
+  mutate(Year = as.numeric(substr(TIME, start = 1, stop = 4))) %>%
+  group_by(Year) %>%
+  summarise(Global_cci = mean(OECD), 
+            USA_cci = mean(USA), 
+            Japan_cci = mean(JPN))
+
+# Creating one df 
+omni <- hardware_sales_yearly %>%
+  full_join(software_sales_yearly, by = 'Year') %>%
+  left_join(economic_indicators, by = 'Year') %>%
+  left_join(cci, by = 'Year') %>%
+  select(-...1) %>%
+  arrange(Year) %>%
+  # Dropping incomplete year 2023
+  filter(Year != 2023)
 ```
 
 #### Exploratory Data Analysis
 ```{r}
-
+tail(omni)
+```
+```{r}
+head(omni)
 ```
 
 
