@@ -1,6 +1,8 @@
 ---
 title: "VideoGameSales"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 *This document represents a reevaluation and refinement of a previous project I participated in earlier in 2023. While many of the ideas originate from that project, this iteration emphasizes the implementation of more suitable statistical analysis techniques, while also showcasing a substantial effort in rewriting the code to enhance readability and conciseness.*
 
